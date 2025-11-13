@@ -1,5 +1,7 @@
 package llm
 
+//go:generate mockgen -destination=./service_mock_test.go -package=llm -source=service.go Service
+
 import (
 	"context"
 	"fmt"
