@@ -26,13 +26,13 @@ type LLMClient interface {
 	Summarize(ctx context.Context, twilioSID string) (string, error)
 }
 
-// ChatClient is for talking to the ChatGateway (talks to Twilio).
+// ChatClient is for talking to the ChatGateway.
 type ChatClient interface {
 	RemoveBot(ctx context.Context, twilioSID string) error
 	AddExpert(ctx context.Context, twilioSID string, expertID uuid.UUID) error
 }
 
-// httpBillingClient is the real implementation for the BillingClient. makes hhtp call.
+// httpBillingClient is the implementation for the BillingClient.
 type httpBillingClient struct {
 	httpClient *http.Client
 	baseURL    string
@@ -41,24 +41,21 @@ type httpBillingClient struct {
 // NewHTTPBillingClient is the constructor
 func NewHTTPBillingClient(baseURL string) BillingClient {
 	return &httpBillingClient{
-		httpClient: &http.Client{Timeout: 5 * time.Second}, // 5 sec timeout
+		httpClient: &http.Client{Timeout: 5 * time.Second},
 		baseURL:    baseURL,
 	}
 }
 
-// this is the DTO we need to send to the billing service.
 type debitRequest struct {
 	UserID string `json:"user_id"`
 }
 
 func (c *httpBillingClient) DebitToken(ctx context.Context, userID uuid.UUID) error {
-	// turn my go struct into json. this shouldn't fail...
 	reqBody, err := json.Marshal(debitRequest{UserID: userID.String()})
 	if err != nil {
 		return fmt.Errorf("could not marshal debit request: %w", err)
 	}
 
-	// build the actual http request
 	url := c.baseURL + "/token/debit"
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(reqBody))
 	if err != nil {
@@ -66,45 +63,155 @@ func (c *httpBillingClient) DebitToken(ctx context.Context, userID uuid.UUID) er
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	// fire it off
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("debit request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
-	// check if the billing service was happy
 	if resp.StatusCode != http.StatusOK {
-		// We know that 409 means "no money"
-		if resp.StatusCode == http.StatusConflict {
+		if resp.StatusCode == http.StatusConflict { //
 			return fmt.Errorf("insufficient funds")
 		}
-		// some other disaster
 		return fmt.Errorf("billing service returned non-200 status: %d", resp.StatusCode)
 	}
 
 	return nil
 }
 
-// --- STUBBED CLIENTS ---
-// I havent built the other services yet, so I'm using these fake ones for now. My RequestService will get injected with these stubs until I build the real ones.
-
-type stubLLMClient struct{}
-
-func NewStubLLMClient() LLMClient { return &stubLLMClient{} }
-func (c *stubLLMClient) Summarize(ctx context.Context, twilioSID string) (string, error) {
-	// TODO: actually build the LLM Gateway and make this call it
-	return "User needs help with their Wi-Fi.", nil
+type httpLLMClient struct {
+	httpClient *http.Client
+	baseURL    string
 }
 
-type stubChatClient struct{}
+// NewHTTPLLMClient is the constructor for the llm client.
+func NewHTTPLLMClient(baseURL string) LLMClient {
+	return &httpLLMClient{
+		httpClient: &http.Client{Timeout: 15 * time.Second}, // Longer timeout for LLM
+		baseURL:    baseURL,
+	}
+}
 
-func NewStubChatClient() ChatClient { return &stubChatClient{} }
-func (c *stubChatClient) RemoveBot(ctx context.Context, twilioSID string) error {
-	// TODO: Connect to Chat Gateway
+// DTOs for LLMGatewayService
+type summarizeRequest struct {
+	TwilioConversationSID string `json:"twilio_conversation_sid"`
+}
+type summarizeResponse struct {
+	Summary string `json:"summary"`
+}
+
+// Summarize makes an http call to the LLMGatewayService.
+func (c *httpLLMClient) Summarize(ctx context.Context, twilioSID string) (string, error) {
+	// Create the request body
+	reqBody, err := json.Marshal(summarizeRequest{TwilioConversationSID: twilioSID})
+	if err != nil {
+		return "", fmt.Errorf("could not marshal summarize request: %w", err)
+	}
+
+	// Create the http request
+	url := c.baseURL + "/chat/summarize" // This matches llm handler
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(reqBody))
+	if err != nil {
+		return "", fmt.Errorf("could not create summarize http request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	// Make the call
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("summarize request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Handle non-200 responses
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("llm service returned non-200 status: %d", resp.StatusCode)
+	}
+
+	// decode the response
+	var summaryResp summarizeResponse
+	if err := json.NewDecoder(resp.Body).Decode(&summaryResp); err != nil {
+		return "", fmt.Errorf("could not decode summarize response: %w", err)
+	}
+
+	return summaryResp.Summary, nil
+}
+
+type httpChatClient struct {
+	httpClient *http.Client
+	baseURL    string
+}
+
+// NewHTTPChatClient is the constructor for the real Chat client.
+func NewHTTPChatClient(baseURL string) ChatClient {
+	return &httpChatClient{
+		httpClient: &http.Client{Timeout: 5 * time.Second},
+		baseURL:    baseURL,
+	}
+}
+
+// DTOs for ChatGatewayService
+type removeBotRequest struct {
+	TwilioConversationSID string `json:"twilio_conversation_sid"`
+}
+type addExpertRequest struct {
+	TwilioConversationSID string `json:"twilio_conversation_sid"`
+	ExpertID              string `json:"expert_id"`
+}
+
+// RemoveBot makes an http call to the ChatGatewayService.
+func (c *httpChatClient) RemoveBot(ctx context.Context, twilioSID string) error {
+	reqBody, err := json.Marshal(removeBotRequest{TwilioConversationSID: twilioSID})
+	if err != nil {
+		return fmt.Errorf("could not marshal remove-bot request: %w", err)
+	}
+
+	url := c.baseURL + "/chat/remove-bot"
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(reqBody))
+	if err != nil {
+		return fmt.Errorf("could not create remove-bot http request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("remove-bot request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("chat service (remove-bot) returned non-200 status: %d", resp.StatusCode)
+	}
+
 	return nil
 }
-func (c *stubChatClient) AddExpert(ctx context.Context, twilioSID string, expertID uuid.UUID) error {
-	// TODO
+
+// AddExpert makes an http call to the ChatGatewayService.
+func (c *httpChatClient) AddExpert(ctx context.Context, twilioSID string, expertID uuid.UUID) error {
+	reqBody, err := json.Marshal(addExpertRequest{
+		TwilioConversationSID: twilioSID,
+		ExpertID:              expertID.String(),
+	})
+	if err != nil {
+		return fmt.Errorf("could not marshal add-expert request: %w", err)
+	}
+
+	url := c.baseURL + "/chat/add-expert"
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(reqBody))
+	if err != nil {
+		return fmt.Errorf("could not create add-expert http request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("add-expert request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("chat service (add-expert) returned non-200 status: %d", resp.StatusCode)
+	}
+
 	return nil
 }

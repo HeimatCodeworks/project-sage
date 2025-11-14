@@ -39,8 +39,8 @@ func main() {
 
 	// Initialize the HTTP clients for other services.
 	billingClient := request.NewHTTPBillingClient(billingSvcURL)
-	llmClient := request.NewStubLLMClient()   // Using a stub for now.
-	chatClient := request.NewStubChatClient() // Also a stub.
+	llmClient := request.NewHTTPLLMClient(llmSvcURL)
+	chatClient := request.NewHTTPChatClient(chatSvcURL)
 
 	// Initialize the service, injecting dependencies.
 	requestService := request.NewService(requestRepo, billingClient, llmClient, chatClient)

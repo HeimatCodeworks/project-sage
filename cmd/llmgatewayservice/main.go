@@ -18,15 +18,11 @@ func main() {
 	// This service depends on clients for other services.
 
 	// Get external service URLs. For now, they aren't used by the stubs.
-	_ = os.Getenv("CHAT_GATEWAY_URL") // eg "http://chatgateway:8084"
-	_ = os.Getenv("GEMINI_API_KEY")   // This will be needed for the real client
+	chatGatewayURL := os.Getenv("CHAT_GATEWAY_URL") // eg "http://chatgateway:8084"
+	_ = os.Getenv("GEMINI_API_KEY")
 
-	// Stub clients for now.
 	geminiClient := llm.NewStubGeminiClient()
-	chatClient := llm.NewStubChatGatewayClient()
-	// For real implementation:
-	// geminiClient := llm.NewRealGeminiClient(geminiKey)
-	// chatClient := llm.NewHTTPChatGatewayClient(chatGatewayURL)
+	chatClient := llm.NewHTTPChatGatewayClient(chatGatewayURL)
 
 	// Inject clients into the service
 	llmService := llm.NewService(geminiClient, chatClient)
