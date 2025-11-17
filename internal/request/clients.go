@@ -1,6 +1,6 @@
 package request
 
-//go:generate mockgen -destination=./clients_mock_test.go -package=request -source=clients.go BillingClient,LLMClient,ChatClient
+//go:generate mockgen -destination=./clients_mock_test.go -package=request -source=clients.go BillingClient,LLMClient,ChatClient,UserClient
 
 import (
 	"bytes"
@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"project-sage/internal/domain"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,6 +31,11 @@ type LLMClient interface {
 type ChatClient interface {
 	RemoveBot(ctx context.Context, twilioSID string) error
 	AddExpert(ctx context.Context, twilioSID string, expertID uuid.UUID) error
+}
+
+// UserClient is the contract for talking to the UserService [NEW v1.1]
+type UserClient interface {
+	GetUserProfile(ctx context.Context, userID uuid.UUID) (*domain.User, error)
 }
 
 // httpBillingClient is the implementation for the BillingClient.
@@ -214,4 +220,50 @@ func (c *httpChatClient) AddExpert(ctx context.Context, twilioSID string, expert
 	}
 
 	return nil
+}
+
+// --- UserClient Implementation ---
+
+// httpUserClient is the implementation for the UserClient.
+type httpUserClient struct {
+	httpClient *http.Client
+	baseURL    string
+}
+
+// NewHTTPUserClient is the constructor for the real User client.
+func NewHTTPUserClient(baseURL string) UserClient {
+	return &httpUserClient{
+		httpClient: &http.Client{Timeout: 5 * time.Second},
+		baseURL:    baseURL,
+	}
+}
+
+// GetUserProfile makes an http call to the UserService.
+func (c *httpUserClient) GetUserProfile(ctx context.Context, userID uuid.UUID) (*domain.User, error) {
+	// This endpoint path is an assumption for internal service-to-service comms.
+	// need to add this route to the UserService's handler.
+	url := fmt.Sprintf("%s/users/internal/%s", c.baseURL, userID.String())
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("could not create get-user http request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("get-user request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("user service returned non-200 status: %d", resp.StatusCode)
+	}
+
+	// Decode the JSON response into a domain.User struct
+	var user domain.User
+	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
+		return nil, fmt.Errorf("could not decode user profile: %w", err)
+	}
+
+	return &user, nil
 }

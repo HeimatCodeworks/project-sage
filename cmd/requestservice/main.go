@@ -36,14 +36,16 @@ func main() {
 	billingSvcURL := os.Getenv("BILLING_SERVICE_URL")
 	llmSvcURL := os.Getenv("LLM_SERVICE_URL")
 	chatSvcURL := os.Getenv("CHAT_SERVICE_URL")
+	userSvcURL := os.Getenv("USER_SERVICE_URL")
 
 	// Initialize the HTTP clients for other services.
 	billingClient := request.NewHTTPBillingClient(billingSvcURL)
 	llmClient := request.NewHTTPLLMClient(llmSvcURL)
 	chatClient := request.NewHTTPChatClient(chatSvcURL)
+	userClient := request.NewHTTPUserClient(userSvcURL)
 
 	// Initialize the service, injecting dependencies.
-	requestService := request.NewService(requestRepo, billingClient, llmClient, chatClient)
+	requestService := request.NewService(requestRepo, billingClient, llmClient, chatClient, userClient)
 
 	// Initialize the handler.
 	requestHandler := request.NewHandler(requestService)
@@ -77,6 +79,7 @@ func main() {
 
 // connectDB opens and verifies the database connection.
 func connectDB(connStr string) (*sql.DB, error) {
+	// Use "pgx" as the driver name
 	db, err := sql.Open("pgx", connStr)
 	if err != nil {
 		return nil, err

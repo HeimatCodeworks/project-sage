@@ -76,3 +76,60 @@ func TestService_DebitToken_InsufficientFunds(t *testing.T) {
 		t.Fatalf("Service returned wrong error: got '%v', want '%v'", err, repoError)
 	}
 }
+
+// TestService_CreditToken_Success tests the "happy path" for crediting.
+func TestService_CreditToken_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockRepo := NewMockRepository(ctrl)
+	s := NewService(mockRepo)
+
+	ctx := context.Background()
+	testUserID := uuid.New()
+	amountToAdd := 5
+	expectedNewBalance := 8 // eg if they had 3, now they have 8
+
+	// Expect CreditToken to be called once with 5.
+	// Return the new balance of 8.
+	mockRepo.EXPECT().
+		CreditToken(ctx, testUserID, amountToAdd).
+		Return(expectedNewBalance, nil).
+		Times(1)
+
+	newBalance, err := s.CreditToken(ctx, testUserID, amountToAdd)
+
+	if err != nil {
+		t.Fatalf("Service returned an unexpected error: %v", err)
+	}
+	if newBalance != expectedNewBalance {
+		t.Fatalf("Expected new balance of %d, got %d", expectedNewBalance, newBalance)
+	}
+}
+
+func TestService_CreditToken_Error(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockRepo := NewMockRepository(ctrl)
+	s := NewService(mockRepo)
+
+	ctx := context.Background()
+	testUserID := uuid.New()
+	amountToAdd := 5
+	repoError := fmt.Errorf("user not found") // The repo returns this
+
+	// Expect CreditToken to be called, and return our fake error.
+	mockRepo.EXPECT().
+		CreditToken(ctx, testUserID, amountToAdd).
+		Return(0, repoError).
+		Times(1)
+
+	_, err := s.CreditToken(ctx, testUserID, amountToAdd)
+
+	if err == nil {
+		t.Fatal("Service did not return an error, but one was expected")
+	}
+	// Check that the service passed the error up.
+	if err.Error() != "user not found" {
+		t.Fatalf("Service returned wrong error: got '%v', want '%v'", err, repoError)
+	}
+}

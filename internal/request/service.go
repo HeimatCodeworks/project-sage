@@ -26,31 +26,43 @@ type service struct {
 	billingClient BillingClient // Client for the BillingService
 	llmClient     LLMClient     // Client for the LLMGatewayService
 	chatClient    ChatClient    // Client for the ChatGatewayService
+	userClient    UserClient    // Client for the UserService
 }
 
 // NewService is the constructor, injecting all required dependencies.
-func NewService(r Repository, bc BillingClient, lc LLMClient, cc ChatClient) Service {
+func NewService(r Repository, bc BillingClient, lc LLMClient, cc ChatClient, uc UserClient) Service {
 	return &service{
 		repo:          r,
 		billingClient: bc,
 		llmClient:     lc,
 		chatClient:    cc,
+		userClient:    uc,
 	}
 }
 
 // CreateRequest orchestrates the new request handoff: debiting a token, summarizing the chat, and creating the request record.
 func (s *service) CreateRequest(ctx context.Context, userID uuid.UUID, twilioSID string) (*domain.AssistanceRequest, error) {
 
-	// Attempt to debit a token from the billing service first.
-	if err := s.billingClient.DebitToken(ctx, userID); err != nil {
-		// If debit fails (eg insufficient funds), stop the process.
-		return nil, fmt.Errorf("token debit failed: %w", err)
+	// all UserClient to fetch user's role.
+	user, err := s.userClient.GetUserProfile(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("could not fetch user profile: %w", err)
 	}
+
+	// Attempt to debit a token only if not a superadmin.
+	if user.Role != "superadmin" {
+		// This is a normal user, so debit a token.
+		if err := s.billingClient.DebitToken(ctx, userID); err != nil {
+			// If debit fails (eg insufficient funds), stop the process.
+			return nil, fmt.Errorf("token debit failed: %w", err)
+		}
+	}
+	// If user.Role == "superadmin", we just skip this block.
 
 	// Get the LLM summary of the chat.
 	summary, err := s.llmClient.Summarize(ctx, twilioSID)
 	if err != nil {
-		// If summary fails, the token was already debited. Log this as a warning.
+		// If summary fails, the token may have been debited. Log this as a warning.
 		fmt.Printf("WARNING: Token debited for user %s, but LLM summary failed: %v\n", userID, err)
 		return nil, fmt.Errorf("could not summarize chat: %w", err)
 	}

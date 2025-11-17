@@ -14,6 +14,7 @@ import (
 	domain "project-sage/internal/domain"
 	reflect "reflect"
 
+	uuid "github.com/google/uuid"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -68,4 +69,19 @@ func (m *MockRepository) GetUserByFirebaseID(ctx context.Context, firebaseID str
 func (mr *MockRepositoryMockRecorder) GetUserByFirebaseID(ctx, firebaseID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserByFirebaseID", reflect.TypeOf((*MockRepository)(nil).GetUserByFirebaseID), ctx, firebaseID)
+}
+
+// GetUserByID mocks base method.
+func (m *MockRepository) GetUserByID(ctx context.Context, userID uuid.UUID) (*domain.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetUserByID", ctx, userID)
+	ret0, _ := ret[0].(*domain.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetUserByID indicates an expected call of GetUserByID.
+func (mr *MockRepositoryMockRecorder) GetUserByID(ctx, userID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserByID", reflect.TypeOf((*MockRepository)(nil).GetUserByID), ctx, userID)
 }

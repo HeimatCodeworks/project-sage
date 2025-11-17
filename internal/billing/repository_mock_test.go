@@ -41,6 +41,21 @@ func (m *MockRepository) EXPECT() *MockRepositoryMockRecorder {
 	return m.recorder
 }
 
+// CreditToken mocks base method.
+func (m *MockRepository) CreditToken(ctx context.Context, userID uuid.UUID, amount int) (int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreditToken", ctx, userID, amount)
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreditToken indicates an expected call of CreditToken.
+func (mr *MockRepositoryMockRecorder) CreditToken(ctx, userID, amount any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreditToken", reflect.TypeOf((*MockRepository)(nil).CreditToken), ctx, userID, amount)
+}
+
 // DebitToken mocks base method.
 func (m *MockRepository) DebitToken(ctx context.Context, userID uuid.UUID) (int, error) {
 	m.ctrl.T.Helper()

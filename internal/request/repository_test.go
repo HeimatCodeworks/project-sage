@@ -62,6 +62,7 @@ func setupPrerequisites() error {
 		DisplayName:            "Request Test User",
 		MembershipTier:         "free",
 		AssistanceTokenBalance: 3,
+		Role:                   "user",
 	}
 	// Define the test expert.
 	testExpert = &domain.Expert{
@@ -69,25 +70,42 @@ func setupPrerequisites() error {
 		FirebaseAuthID: "fb-req-test-expert",
 		DisplayName:    "Expert Joe",
 		IsActive:       true,
+		Role:           "expert",
 	}
 
 	// Insert the user.
-	queryUser := `INSERT INTO users (user_id, firebase_auth_id, display_name, membership_tier, assistance_token_balance)
-				 VALUES ($1, $2, $3, $4, $5)`
-	_, err := testDB.Exec(queryUser, testUser.UserID, testUser.FirebaseAuthID, testUser.DisplayName, testUser.MembershipTier, testUser.AssistanceTokenBalance)
+	queryUser := `INSERT INTO users (user_id, firebase_auth_id, display_name, membership_tier, assistance_token_balance, role)
+				 VALUES ($1, $2, $3, $4, $5, $6)`
+	_, err := testDB.Exec(queryUser,
+		testUser.UserID,
+		testUser.FirebaseAuthID,
+		testUser.DisplayName,
+		testUser.MembershipTier,
+		testUser.AssistanceTokenBalance,
+		testUser.Role,
+	)
 	if err != nil {
 		return err
 	}
 
 	// Insert the expert.
-	queryExpert := `INSERT INTO experts (expert_id, firebase_auth_id, display_name, is_active)
-					 VALUES ($1, $2, $3, $4)`
-	_, err = testDB.Exec(queryExpert, testExpert.ExpertID, testExpert.FirebaseAuthID, testExpert.DisplayName, testExpert.IsActive)
+	queryExpert := `INSERT INTO experts (expert_id, firebase_auth_id, display_name, is_active, role)
+					 VALUES ($1, $2, $3, $4, $5)`
+	_, err = testDB.Exec(queryExpert,
+		testExpert.ExpertID,
+		testExpert.FirebaseAuthID,
+		testExpert.DisplayName,
+		testExpert.IsActive,
+		testExpert.Role,
+	)
 	return err
 }
 
 // cleanAllTables wipes all test data respecting foreign key constraints.
 func cleanAllTables() {
+	if testDB == nil {
+		return
+	}
 	// Delete in order of dependency.
 	testDB.Exec("DELETE FROM expert_ratings")
 	testDB.Exec("DELETE FROM assistance_requests")

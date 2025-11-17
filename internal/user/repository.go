@@ -18,6 +18,8 @@ type Repository interface {
 	CreateUser(ctx context.Context, user *domain.User) error
 	// GetUserByFirebaseID finds a user by their unique auth ID.
 	GetUserByFirebaseID(ctx context.Context, firebaseID string) (*domain.User, error)
+	// GetUserByID finds a user by their primary key (UUID).
+	GetUserByID(ctx context.Context, userID uuid.UUID) (*domain.User, error)
 }
 
 // postgresRepository is the concrete implementation of the Repository that uses a Postgres database
@@ -38,8 +40,9 @@ func (pr *postgresRepository) CreateUser(ctx context.Context, user *domain.User)
 	user.UserID = uuid.New()
 
 	query := `
-		INSERT INTO users (user_id, firebase_auth_id, display_name, profile_image_url, membership_tier, assistance_token_balance)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO users (user_id, firebase_auth_id, display_name, profile_image_url, 
+		                 membership_tier, assistance_token_balance, role)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
 
 	// Execute the query.
@@ -50,6 +53,7 @@ func (pr *postgresRepository) CreateUser(ctx context.Context, user *domain.User)
 		user.ProfileImageURL,
 		user.MembershipTier,
 		user.AssistanceTokenBalance,
+		user.Role,
 	)
 
 	if err != nil {
@@ -59,12 +63,13 @@ func (pr *postgresRepository) CreateUser(ctx context.Context, user *domain.User)
 	return nil
 }
 
-// GetUserByFirebaseID retrievs a single user based on their Firebase ID.
+// GetUserByFirebaseID retrieves a single user based on their Firebase ID.
 func (pr *postgresRepository) GetUserByFirebaseID(ctx context.Context, firebaseID string) (*domain.User, error) {
 	user := &domain.User{}
 
 	query := `
-		SELECT user_id, firebase_auth_id, display_name, profile_image_url, membership_tier, assistance_token_balance
+		SELECT user_id, firebase_auth_id, display_name, profile_image_url, 
+		       membership_tier, assistance_token_balance, role
 		FROM users
 		WHERE firebase_auth_id = $1
 	`
@@ -78,6 +83,7 @@ func (pr *postgresRepository) GetUserByFirebaseID(ctx context.Context, firebaseI
 		&user.ProfileImageURL,
 		&user.MembershipTier,
 		&user.AssistanceTokenBalance,
+		&user.Role,
 	)
 
 	if err != nil {
@@ -86,6 +92,36 @@ func (pr *postgresRepository) GetUserByFirebaseID(ctx context.Context, firebaseI
 			return nil, fmt.Errorf("user not found")
 		}
 		// Some other database error occurred.
+		return nil, fmt.Errorf("could not get user: %w", err)
+	}
+
+	return user, nil
+}
+
+// [GetUserByID retrieves a single user based on their internal UUID.
+func (pr *postgresRepository) GetUserByID(ctx context.Context, userID uuid.UUID) (*domain.User, error) {
+	user := &domain.User{}
+
+	query := `
+		SELECT user_id, firebase_auth_id, display_name, profile_image_url, 
+		       membership_tier, assistance_token_balance, role
+		FROM users
+		WHERE user_id = $1
+	`
+	err := pr.db.QueryRowContext(ctx, query, userID).Scan(
+		&user.UserID,
+		&user.FirebaseAuthID,
+		&user.DisplayName,
+		&user.ProfileImageURL,
+		&user.MembershipTier,
+		&user.AssistanceTokenBalance,
+		&user.Role,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("user not found")
+		}
 		return nil, fmt.Errorf("could not get user: %w", err)
 	}
 

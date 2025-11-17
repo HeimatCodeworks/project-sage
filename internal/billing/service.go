@@ -10,6 +10,7 @@ import (
 // It defines the contract for what the service can do.
 type Service interface {
 	DebitToken(ctx context.Context, userID uuid.UUID) (int, error)
+	CreditToken(ctx context.Context, userID uuid.UUID, amount int) (int, error)
 }
 
 // service is the concrete implementation of the Service interface.
@@ -35,5 +36,15 @@ func (s *service) DebitToken(ctx context.Context, userID uuid.UUID) (int, error)
 		return 0, err
 	}
 
+	return newBalance, nil
+}
+
+// This is also a simple passthrough to the repository's atomic SQL.
+func (s *service) CreditToken(ctx context.Context, userID uuid.UUID, amount int) (int, error) {
+	newBalance, err := s.repo.CreditToken(ctx, userID, amount)
+	if err != nil {
+		// Pass up errors like "user not found"
+		return 0, err
+	}
 	return newBalance, nil
 }

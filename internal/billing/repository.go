@@ -15,6 +15,7 @@ import (
 type Repository interface {
 	// DebitToken should atomically decrement a user's token balance.
 	DebitToken(ctx context.Context, userID uuid.UUID) (int, error)
+	CreditToken(ctx context.Context, userID uuid.UUID, amount int) (int, error)
 }
 
 // postgresRepository is the concrete implementation of the Repository that uses Postgres.
@@ -53,6 +54,29 @@ func (pr *postgresRepository) DebitToken(ctx context.Context, userID uuid.UUID) 
 		}
 		// something else went wrong (eg. connection dropped)
 		return 0, fmt.Errorf("database error during debit: %w", err)
+	}
+
+	return newBalance, nil
+}
+
+func (pr *postgresRepository) CreditToken(ctx context.Context, userID uuid.UUID, amount int) (int, error) {
+	var newBalance int
+
+	query := `
+		UPDATE users
+		SET assistance_token_balance = assistance_token_balance + $1
+		WHERE user_id = $2
+		RETURNING assistance_token_balance
+	`
+
+	// Use QueryRowContext().Scan() because returning gives new balance
+	err := pr.db.QueryRowContext(ctx, query, amount, userID).Scan(&newBalance)
+	if err != nil {
+		// If the user_id doesn't existreturn sql.ErrNoRows.
+		if err == sql.ErrNoRows {
+			return 0, fmt.Errorf("user not found")
+		}
+		return 0, fmt.Errorf("database error during credit: %w", err)
 	}
 
 	return newBalance, nil

@@ -21,22 +21,33 @@ func NewHandler(s Service) *Handler {
 	}
 }
 
-// RegisterRoutes sets up the API routes for this handler.
-// This service only has one endpoint.
+// RegisterRoutes sets up the API routes for this handler
 func (h *Handler) RegisterRoutes(r chi.Router) {
 	r.Post("/token/debit", h.handleDebitToken)
+
+	r.Post("/token/add", h.handleCreditToken)
 }
 
-// debitRequest is the DTO for the request body.
-// The RequestService will send us json that looks like this.
+// --- DTOs ---
+
+type creditRequest struct {
+	UserID string `json:"user_id"`
+	Amount int    `json:"amount"`
+}
+
+type creditResponse struct {
+	NewBalance int `json:"new_balance"`
+}
+
 type debitRequest struct {
 	UserID string `json:"user_id"`
 }
 
-// debitResponse is the DTO for our success response.
 type debitResponse struct {
 	NewBalance int `json:"new_balance"`
 }
+
+// --- Handlers ---
 
 // handleDebitToken is the main handler function for our one endpoint.
 func (h *Handler) handleDebitToken(w http.ResponseWriter, r *http.Request) {
@@ -71,6 +82,41 @@ func (h *Handler) handleDebitToken(w http.ResponseWriter, r *http.Request) {
 	// Success. Send back the new balance.
 	writeJSON(w, http.StatusOK, debitResponse{NewBalance: newBalance})
 }
+
+// This is called by the PaymentService.
+func (h *Handler) handleCreditToken(w http.ResponseWriter, r *http.Request) {
+	// Try to decode the json body.
+	var req creditRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	// Validate the UserID.
+	userID, err := uuid.Parse(req.UserID)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid user_id format")
+		return
+	}
+
+	// we should only be adding positive amounts.
+	if req.Amount <= 0 {
+		writeError(w, http.StatusBadRequest, "Amount must be positive")
+		return
+	}
+
+	// Call the business logic layer.
+	newBalance, err := h.service.CreditToken(r.Context(), userID, req.Amount)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Could not process credit")
+		return
+	}
+
+	// Success. Send back the new balance.
+	writeJSON(w, http.StatusOK, creditResponse{NewBalance: newBalance})
+}
+
+// --- Helper Functions ---
 
 // writeJSON is a helper to send json responses.
 func writeJSON(w http.ResponseWriter, status int, data interface{}) {

@@ -7,6 +7,7 @@ import (
 	// "project-sage/internal/auth" // For when auth exists
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
 // Handler is the HTTP API layer for the UserService.
@@ -24,11 +25,18 @@ func NewHandler(s Service) *Handler {
 
 // RegisterRoutes attaches all the user related endpoints to the router.
 func (h *Handler) RegisterRoutes(r chi.Router) {
+	// --- Client-Facing (Flutter App) Endpoints ---
+
 	// Endpoint for a new user to register their profile
 	r.Post("/users/register", h.handleRegisterNewUser)
 
 	// Endpoint for a user to fetch their own profile.
 	r.Get("/users/profile", h.handleGetMyProfile)
+
+	// --- Internal (Service-to-Service) Endpoint ---
+
+	// endpoint for RequestService to fetch a user by UUID.
+	r.Get("/users/internal/{userID}", h.handleGetUserByID)
 }
 
 // registerUserRequest is the DTO for the post /users/register endpoint.
@@ -75,7 +83,7 @@ func (h *Handler) handleGetMyProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call the service to get the user's data.
-	user, err := h.service.GetUser(r.Context(), firebaseID)
+	user, err := h.service.GetUserByFirebaseID(r.Context(), firebaseID)
 	if err != nil {
 		// Handle the "not found" case.
 		if err.Error() == "user not found" {
@@ -88,6 +96,29 @@ func (h *Handler) handleGetMyProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send the user profile as json.
+	writeJSON(w, http.StatusOK, user)
+}
+
+// handleGetUserByID is the internal handler to get a user by their UUID.
+func (h *Handler) handleGetUserByID(w http.ResponseWriter, r *http.Request) {
+	userIDStr := chi.URLParam(r, "userID")
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid user_id format")
+		return
+	}
+
+	// Call the new service method.
+	user, err := h.service.GetUserByID(r.Context(), userID)
+	if err != nil {
+		if err.Error() == "user not found" {
+			writeError(w, http.StatusNotFound, "User not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "Could not retrieve user")
+		return
+	}
+
 	writeJSON(w, http.StatusOK, user)
 }
 
