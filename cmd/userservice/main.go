@@ -10,6 +10,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/rs/cors"
 )
 
 // main is the entry point for the UserService.
@@ -45,6 +47,16 @@ func main() {
 	// Add standard middleware.
 	r.Use(middleware.Logger)    // Log requests
 	r.Use(middleware.Recoverer) // Handle panics gracefully
+
+	c := cors.New(cors.Options{
+		AllowedOrigins: []string{"*"},
+		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "X-Firebase-ID"},
+		ExposedHeaders: []string{"Link"},
+		Debug:          true,
+		MaxAge:         300,
+	})
+	r.Use(c.Handler)
 
 	// Simple health check.
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {

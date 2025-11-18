@@ -12,7 +12,7 @@ class ProfileNotFoundException implements Exception {
 
 // The Riverpod Provider for API Client
 final apiClientProvider = Provider<ApiClient>((ref) {
-  final baseUrl = 'https://your-api-gateway-url.com/api/v1';
+  final baseUrl = 'http://localhost:8080';
 
   final dio = Dio(BaseOptions(baseUrl: baseUrl));
 
@@ -55,7 +55,6 @@ class ApiClient {
   }
 }
 
-// Auth Interceptor
 class AuthInterceptor extends Interceptor {
   final FirebaseAuth _auth;
 
@@ -68,19 +67,16 @@ class AuthInterceptor extends Interceptor {
   ) async {
     final user = _auth.currentUser;
     if (user == null) {
-      // No user, just continue
       return handler.next(options);
     }
 
     try {
-      // Get the Firebase JWT (idToken)
       final token = await user.getIdToken();
-
-      // Attach it as a Bearer token
       options.headers['Authorization'] = 'Bearer $token';
+      options.headers['X-Firebase-ID'] = user.uid;
+
       return handler.next(options);
     } catch (e) {
-      // Handle error (eg. token refresh failed)
       return handler.reject(DioException(requestOptions: options, error: e));
     }
   }
