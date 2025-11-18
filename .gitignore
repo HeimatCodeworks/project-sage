@@ -1,0 +1,81 @@
+# -----------------------
+# Generic / IDEs
+# -----------------------
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+thumbs.db
+ehthumbs.db
+desktop.ini
+
+# -----------------------
+# Golang (Backend)
+# -----------------------
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+
+# Test binary, built with `go test -c`
+*.test
+
+*.out
+
+
+# -----------------------
+# Flutter / Dart (Frontend)
+# -----------------------
+.dart_tool/
+.packages
+.pub/
+build/
+
+**/doc/api/
+**/ios/Flutter/App.framework
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/app.flx
+**/ios/Flutter/app.zip
+**/ios/Flutter/flutter_assets/
+**/ios/ServiceDefinitions.json
+**/ios/Runner/GeneratedPluginRegistrant.*
+
+# Android-specific
+**/*.jks
+**/*.keystore
+**/*.key
+**/android/key.properties
+**/android/local.properties
+**/android/app/build/
+**/android/.gradle/
+
+# iOS-specific
+**/ios/.generated/
+**/ios/Pods/
+**/ios/Podfile.lock
+
+# -----------------------
+# Firebase & Secrets
+# -----------------------
+user_app/lib/firebase_options.dart
+
+**/google-services.json
+**/GoogleService-Info.plist
+
+# Firebase emulator/cache
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# -----------------------
+# Node / NPM (If you use Cloud Functions later)
+# -----------------------
+node_modules/
+npm-debug.log
+yarn-error.log
